@@ -36,7 +36,7 @@ const viewOrder = async (req, res) => {
     const id = req.params.id;
     const order = await orderModel.findById(id);
     if (order) {
-      return res.status(202).send({
+      return res.status(200).send({
         status: "success",
         order,
       });
@@ -63,7 +63,7 @@ const finalizeOrder = async (req, res) => {
       const updateorder = await orderModel.findByIdAndUpdate(id, order, {
         new: true,
       });
-      return res.status(200).send({
+      return res.status(202).send({
         status: "success",
         updateorder,
       });
