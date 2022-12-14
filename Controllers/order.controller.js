@@ -58,7 +58,7 @@ const finalizeOrder = async (req, res) => {
   try {
     const id = req.params.id;
     const order = await orderModel.findById(id);
-    if (order) {
+    if (order && order.status==='Pending') {
       order.status = "Confirm";
       const updateorder = await orderModel.findByIdAndUpdate(id, order, {
         new: true,
@@ -70,7 +70,7 @@ const finalizeOrder = async (req, res) => {
     } else {
       return res.status(400).send({
         status: "Error",
-        message: "Invalid order id.",
+        message: "Invalid order id or order is either already finalized or delivered",
       });
     }
   } catch (error) {
@@ -86,7 +86,7 @@ const markDelivered = async (req, res) => {
     const id = req.params.id;
 
     const order = await orderModel.findById(id);
-    if (order) {
+    if (order && order.status==='Confirm') {
       order.status = "Delivered";
       const updateorder = await orderModel.findByIdAndUpdate(id, order, {
         new: true,
@@ -98,7 +98,7 @@ const markDelivered = async (req, res) => {
     } else {
       return res.status(400).send({
         status: "Error",
-        message: "Invalid order id or status not provided.",
+        message: "Invalid order id or order is either not  finalized or already delivered",
       });
     }
   } catch (error) {
@@ -114,8 +114,26 @@ const addReview = async (req, res) => {
     const id = req.params.id;
     const ratingList = req.body.ratingList;
 
-    const order = await orderModel.findById(id);
-    if (order && !order.reviewGiven && ratingList.length===order.productList.length){
+    let order = await orderModel.findById(id);
+
+    if(order.status !== "Delivered"){
+      return res.status(400).send({
+        status: "Error",
+        message: "Order has not been delivered yet.",
+      })
+    }
+    else if(order.reviewGiven){
+      return res.status(400).send({
+        status: "Error",
+        message: "Order has already been reviewed.",
+      })
+    }
+    else if(ratingList.length!==order.productList.length){
+      return res.status(400).send({
+        status: "Error",
+        message: "list of rating does not matches with product list.",
+      })
+    }else{
       for (let i=0;i<ratingList.length;i++) {
         let vendor = await vendorModel.findById(order.productList[i].vendorId);
         const newOverAllrating = (+vendor.overallRating+ratingList[i].overallRating)/2
@@ -124,13 +142,11 @@ const addReview = async (req, res) => {
         vendor.deliveryRating = newDeliveryRating
         await vendorModel.findByIdAndUpdate(order.productList[i].vendorId,vendor)
       }
+      order.reviewGiven = true
+      await orderModel.findByIdAndUpdate(id, order)
+      
       return res.status(202).send({
         status: "success",
-      });
-    } else {
-      return res.status(400).send({
-        status: "Error",
-        message: "Invalid order id or Review has been already provided or list of rating does not matches with product list",
       });
     }
   } catch (error) {
